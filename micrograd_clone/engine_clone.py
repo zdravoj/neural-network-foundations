@@ -163,15 +163,15 @@ class Value:
         # distinct nodes visited
         visited = set()
         # recursive, per Value in graph
-        def build_topo(v):
+        def build_topo(val):
             # skips if Value already visited
-            if v not in visited:
-                visited.add(v)
+            if val not in visited:
+                visited.add(val)
                 # visit children
-                for child in v._prev:
+                for child in val._prev:
                     build_topo(child)
                 # add Value to list after children
-                topo.append(v)
+                topo.append(val)
         # call on output Value
         build_topo(self)
 
@@ -179,8 +179,8 @@ class Value:
         # set loss gradient 
         self.grad = 1
         # backpropagation from output Value (loss) to first Value in network
-        for v in reversed(topo):
-            v._backward()
+        for val in reversed(topo):
+            val._backward()
 
     def __neg__(self): # -self
         return self * -1
