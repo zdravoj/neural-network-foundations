@@ -1,5 +1,5 @@
 import random
-from micrograd_clone.engine_clone import Value
+from engine_clone import Value
 
 class Module:
     """
