@@ -2,11 +2,11 @@ import torch
 
 class Linear:
   
-  def __init__(self, fan_in, fan_out, bias=True, generator=None):
+  def __init__(self, fan_in, fan_out, bias=True):
     # fan in: n_inputs
     # fan out: n_outputs
     # fan_in**0.5 is kaiming initialization
-    self.weight = torch.randn((fan_in, fan_out), generator=generator) / fan_in**0.5
+    self.weight = torch.randn((fan_in, fan_out)) / fan_in**0.5
     # biases are initialized zero
     self.bias = torch.zeros(fan_out) if bias else None
   
@@ -42,8 +42,12 @@ class BatchNorm1d:
   def __call__(self, x):
     # calculate the forward pass
     if self.training:
-      xmean = x.mean(0, keepdim=True) # batch mean
-      xvar = x.var(0, keepdim=True) # batch variance
+      if x.ndim == 2:
+        dim = 0
+      elif x.ndim == 3:
+        dim = (0, 1)
+      xmean = x.mean(dim, keepdim=True) # batch mean
+      xvar = x.var(dim, keepdim=True) # batch variance
     else: # predictions / forward pass only
       xmean = self.running_mean # training set mean
       xvar = self.running_var # training set variance
@@ -60,8 +64,10 @@ class BatchNorm1d:
   def parameters(self):
     return [self.gamma, self.beta]
 
+
 # self-explanatory
 class Tanh:
+
   def __call__(self, x):
     self.out = torch.tanh(x)
     return self.out
@@ -69,10 +75,60 @@ class Tanh:
     return []
 
 
+# handles character embeddings in the multidimensional space
+# equivalent to matrix C
+class Embedding:
+
+  def __init__(self, num_embeddings, embedding_dim):
+    self.weight = torch.randn((num_embeddings, embedding_dim))
+  
+  def __call__(self, IX):
+    self.out = self.weight[IX] # indexing operation
+    return self.out
+  
+  def parameters(self):
+    return [self.weight]
+
+
+# concatenates embedding vectors
+class FlattenConsecutive:
+
+  def __init__(self, n):
+    self.n = n
+
+  def __call__(self, x):
+    B, T, C = x.shape # incoming dimensions
+    x = x.view(B, T//self.n, C*self.n) # group dimensions
+    if x.shape[1] == 1: # if middle dimension is 1, squeeze out
+      x = x.squeeze(dim=1)
+    self.out = x
+    return self.out
+  
+  def parameters(self):
+    return []
+
+
+# container for NN layers
+# when called, runs an input on the layers sequentially
+class Sequential:
+
+  def __init__(self, layers):
+    self.layers = layers # pass in layers as normal
+
+  def __call__(self, x): # complete forward pass through all layers
+    for layer in self.layers:
+      x = layer(x)
+    self.out = x
+    return self.out
+  
+  def parameters(self):
+    return [p for layer in self.layers for p in layer.parameters()]
+
+
 class ExampleModel:
 
-  def __init__(self, n_in, n_out, n_hidden, n_layers, block_size, generator=None):
-    self.C = torch.randn((n_out, n_in), generator=generator)
+  def __init__(self, n_in, n_out, n_hidden, n_layers, block_size):
+    self.C = torch.randn((n_out, n_in))
     self.layers = [Linear(n_in * block_size, n_hidden), Tanh()]
     for _ in range(n_layers):
       self.layers.append(Linear(n_hidden, n_hidden))
